@@ -1,0 +1,296 @@
+const HLS_URL = 'https://d3d4yli4hf5bmh.cloudfront.net/hls/live.m3u8';
+
+const player = document.getElementById('player');
+const playBtn = document.getElementById('playBtn');
+const stopBtn = document.getElementById('stopBtn');
+const statusText = document.getElementById('status');
+const volumeSlider = document.getElementById('volume');
+const volumeValue = document.getElementById('volumeValue');
+const elapsedTime = document.getElementById('elapsed');
+const artistName = document.getElementById('artistName');
+const trackTitle = document.getElementById('trackTitle');
+const trackMeta = document.getElementById('trackMeta');
+const recentlyPlayedList = document.getElementById('recentlyPlayedList');
+const bannerText = document.getElementById('bannerText');
+const thumbsUpBtn = document.getElementById('thumbsUpBtn');
+const thumbsDownBtn = document.getElementById('thumbsDownBtn');
+const thumbsUpCount = document.getElementById('thumbsUpCount');
+const thumbsDownCount = document.getElementById('thumbsDownCount');
+
+const METADATA_URL = 'https://d3d4yli4hf5bmh.cloudfront.net/metadatav2.json';
+const API_BASE = '/api';
+
+let currentTrackId = null;
+
+function formatTime(seconds) {
+  if (!seconds || isNaN(seconds)) return '0:00';
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+  return `${minutes}:${String(secs).padStart(2, '0')}`;
+}
+
+async function fetchAndUpdateMetadata() {
+  try {
+    console.log('Fetching metadata from:', METADATA_URL);
+    const response = await fetch(METADATA_URL);
+    if (!response.ok) {
+      console.error('Metadata fetch failed:', response.status, response.statusText);
+      return;
+    }
+    const data = await response.json();
+    console.log('Metadata fetched:', data);
+
+    artistName.textContent = data.artist || '—';
+    trackTitle.textContent = data.title || '—';
+    bannerText.textContent = (data.artist || '—').toUpperCase();
+
+    let metaText = '';
+    if (data.album) metaText += data.album;
+    if (data.date) metaText += metaText ? ` • ${data.date}` : data.date;
+    if (data.sample_rate) metaText += metaText ? ` • ${data.sample_rate}Hz` : `${data.sample_rate}Hz`;
+    if (data.bit_depth) metaText += metaText ? ` • ${data.bit_depth}-bit` : `${data.bit_depth}-bit`;
+
+    trackMeta.textContent = metaText || '—';
+
+    const coverImage = document.getElementById('coverImage');
+    coverImage.src = 'https://d3d4yli4hf5bmh.cloudfront.net/cover.jpg?t=' + Date.now();
+
+    renderRecentlyPlayed(data);
+    updateTrackRating(data);
+  } catch (error) {
+    console.error('Error fetching metadata:', error);
+    console.error('Error details:', error.message);
+  }
+}
+
+function renderRecentlyPlayed(data) {
+  recentlyPlayedList.innerHTML = '';
+
+  for (let i = 1; i <= 5; i++) {
+    const artistKey = `prev_artist_${i}`;
+    const titleKey = `prev_title_${i}`;
+
+    if (data[artistKey] && data[titleKey]) {
+      const item = document.createElement('div');
+      item.className = 'recent-item';
+      item.textContent = `${data[artistKey]} - ${data[titleKey]}`;
+      recentlyPlayedList.appendChild(item);
+    }
+  }
+}
+
+function generateTrackId(artist, title) {
+  return `${artist}-${title}`.toLowerCase().replace(/[^a-z0-9-]/g, '');
+}
+
+function updateTrackRating(data) {
+  const trackId = generateTrackId(data.artist, data.title);
+  console.log('updateTrackRating called. Current:', currentTrackId, 'New:', trackId);
+  if (currentTrackId !== trackId) {
+    currentTrackId = trackId;
+    console.log('Track ID updated to:', currentTrackId);
+    fetchRatingCounts(trackId);
+  }
+}
+
+async function fetchRatingCounts(trackId) {
+  try {
+    const response = await fetch(`${API_BASE}/ratings/${trackId}`);
+    const data = await response.json();
+
+    thumbsUpCount.textContent = data.thumbs_up || 0;
+    thumbsDownCount.textContent = data.thumbs_down || 0;
+
+    updateRatingButtonStates(data.user_rating);
+  } catch (error) {
+    console.error('Error fetching ratings:', error);
+  }
+}
+
+function updateRatingButtonStates(userRating) {
+  thumbsUpBtn.classList.remove('active');
+  thumbsDownBtn.classList.remove('active');
+
+  if (userRating === 'up') {
+    thumbsUpBtn.classList.add('active');
+  } else if (userRating === 'down') {
+    thumbsDownBtn.classList.add('active');
+  }
+}
+
+async function submitRating(trackId, rating) {
+  try {
+    console.log('Submitting rating:', rating, 'for track:', trackId);
+    const response = await fetch(`${API_BASE}/ratings/${trackId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rating })
+    });
+    console.log('Rating response:', response.status);
+
+    if (response.ok || response.status === 409) {
+      await fetchRatingCounts(trackId);
+    }
+  } catch (error) {
+    console.error('Error submitting rating:', error);
+  }
+}
+
+function startMetadataPolling() {
+  fetchAndUpdateMetadata();
+  setInterval(fetchAndUpdateMetadata, 5000);
+}
+
+// Fallback: if metadata fails to load, set a test track so buttons work
+setTimeout(() => {
+  if (!currentTrackId) {
+    console.warn('Metadata not loaded after 3s. Setting test track ID.');
+    currentTrackId = 'test-track';
+    artistName.textContent = 'Test Artist';
+    trackTitle.textContent = 'Test Track';
+    trackMeta.textContent = 'Test metadata';
+    bannerText.textContent = 'TEST ARTIST';
+    fetchRatingCounts('test-track');
+  }
+}, 3000);
+
+let hls;
+let playStartTime = 0;
+let elapsedAtPause = 0;
+
+function initHLS() {
+  if (Hls.isSupported()) {
+    const hlsConfig = {
+      maxBufferLength: 1.5,
+      maxMaxBufferLength: 3,
+      maxBufferSize: 20 * 1000 * 1000,
+      maxBufferHole: 0.15,
+      lowLatencyMode: true,
+      backBufferLength: 30,
+      manifestLoadingTimeOut: 3000,
+      manifestLoadingRetryDelay: 300,
+      levelLoadingTimeOut: 3000,
+      fragLoadingTimeOut: 8000,
+      fragLoadingErrorRetry: { retryDelayMs: 200, maxNumRetry: 3 },
+    };
+    hls = new Hls(hlsConfig);
+    hls.loadSource(HLS_URL);
+    hls.attachMedia(player);
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      statusText.textContent = 'Stream loaded. Ready to play.';
+    });
+    hls.on(Hls.Events.ERROR, (event, data) => {
+      if (data.type === 'networkError') {
+        statusText.textContent = 'Network error. Check stream URL.';
+      } else if (data.type === 'mediaError') {
+        statusText.textContent = 'Media error. Retrying...';
+        hls.recoverMediaError();
+      } else {
+        statusText.textContent = `Error: ${data.reason || 'Unknown error'}`;
+      }
+    });
+  } else if (player.canPlayType('application/vnd.apple.mpegurl')) {
+    player.src = HLS_URL;
+    statusText.textContent = 'Stream loaded. Ready to play.';
+  } else {
+    statusText.textContent = 'HLS not supported in this browser';
+  }
+}
+
+function play() {
+  if (!player.src && !hls) {
+    initHLS();
+  }
+  player.play();
+  playBtn.textContent = '⏹';
+  statusText.textContent = '▶ Now playing...';
+}
+
+function stop() {
+  player.pause();
+  player.currentTime = 0;
+  if (timeUpdateInterval) clearInterval(timeUpdateInterval);
+  playStartTime = 0;
+  elapsedAtPause = 0;
+  elapsedTime.textContent = '0:00';
+  playBtn.textContent = '▶';
+  statusText.textContent = 'Stopped';
+}
+
+function togglePlayStop() {
+  if (player.paused || !playStartTime) {
+    play();
+  } else {
+    stop();
+  }
+}
+
+playBtn.addEventListener('click', togglePlayStop);
+stopBtn.addEventListener('click', stop);
+
+thumbsUpBtn.addEventListener('click', () => {
+  console.log('Thumbs up clicked. currentTrackId:', currentTrackId);
+  if (currentTrackId) {
+    submitRating(currentTrackId, 'up');
+  } else {
+    console.warn('Cannot submit rating: currentTrackId is null or undefined');
+  }
+});
+
+thumbsDownBtn.addEventListener('click', () => {
+  console.log('Thumbs down clicked. currentTrackId:', currentTrackId);
+  if (currentTrackId) {
+    submitRating(currentTrackId, 'down');
+  } else {
+    console.warn('Cannot submit rating: currentTrackId is null or undefined');
+  }
+});
+
+volumeSlider.addEventListener('input', (e) => {
+  const volume = e.target.value;
+  player.volume = volume / 100;
+  volumeValue.textContent = volume + '%';
+});
+
+function updateElapsedTime() {
+  if (playStartTime === 0) return;
+  const elapsed = (Date.now() - playStartTime) / 1000 + elapsedAtPause;
+  elapsedTime.textContent = formatTime(elapsed);
+}
+
+let timeUpdateInterval;
+
+player.addEventListener('play', () => {
+  playBtn.textContent = '⏹';
+  statusText.textContent = '▶ Now playing...';
+  playStartTime = Date.now();
+
+  if (timeUpdateInterval) clearInterval(timeUpdateInterval);
+  timeUpdateInterval = setInterval(updateElapsedTime, 100);
+});
+
+player.addEventListener('pause', () => {
+  playBtn.textContent = '▶';
+  statusText.textContent = '⏸ Paused';
+  if (timeUpdateInterval) clearInterval(timeUpdateInterval);
+  if (playStartTime > 0) {
+    elapsedAtPause += (Date.now() - playStartTime) / 1000;
+    playStartTime = 0;
+  }
+});
+
+player.addEventListener('error', (e) => {
+  statusText.textContent = 'Playback error. Check your connection.';
+});
+
+player.addEventListener('timeupdate', () => {
+  updateElapsedTime();
+});
+
+initHLS();
+startMetadataPolling();

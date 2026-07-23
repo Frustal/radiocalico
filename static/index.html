@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Radio Calico</title>
+  <link rel="stylesheet" href="/css/main.css" />
+</head>
+<body>
+  <audio id="player" class="audio-player"></audio>
+
+  <header class="app-header">
+    <div class="header-content">
+      <img src="/RadioCalicoLogoTM.png" alt="Radio Calico Logo" class="header-logo" />
+      <h1 class="header-title">Radio Calico</h1>
+    </div>
+  </header>
+
+  <div class="main-container">
+    <div class="now-playing-container">
+      <div class="cover-section">
+        <div class="cover-art">
+          <img src="https://d3d4yli4hf5bmh.cloudfront.net/cover.jpg" alt="Album cover" id="coverImage" />
+        </div>
+      </div>
+
+      <div class="info-section">
+        <div class="track-info">
+          <div class="artist-name" id="artistName">—</div>
+          <div class="track-title" id="trackTitle">—</div>
+          <div class="track-meta" id="trackMeta">—</div>
+        </div>
+
+        <div class="controls-section">
+          <div class="rating-section">
+            <span class="rating-label">Rate this track:</span>
+            <div class="rating-widget">
+              <div class="rating-item">
+                <button id="thumbsUpBtn" class="rating-btn thumbs-up" title="I like this">👍</button>
+                <span id="thumbsUpCount" class="rating-count">0</span>
+              </div>
+              <div class="rating-item">
+                <button id="thumbsDownBtn" class="rating-btn thumbs-down" title="I don't like this">👎</button>
+                <span id="thumbsDownCount" class="rating-count">0</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="player-bar">
+            <button id="playBtn" class="player-btn play-btn">▶</button>
+            <div class="time-display">
+              <span id="elapsed">0:35</span> / <span class="live-indicator">Live</span>
+            </div>
+            <button class="volume-btn">🔊</button>
+            <input type="range" id="volume" min="0" max="100" value="100" class="seek-slider" />
+          </div>
+
+          <div class="status hidden" id="status">Ready</div>
+          <span id="volumeValue" class="hidden">100%</span>
+          <button id="stopBtn" class="hidden"></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="artist-banner" id="artistBanner">
+      <span id="bannerText">—</span>
+    </div>
+
+    <div class="recently-played-section">
+      <h2>Previous Tracks</h2>
+      <div id="recentlyPlayedWidget" class="widget">
+        <div id="recentlyPlayedList" class="recent-list">
+          <!-- Populated by JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script src="/js/main.js"></script>
+  <script src="/js/debug.js"></script>
+</body>
+</html>

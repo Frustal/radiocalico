@@ -1,0 +1,28 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Runtime data
+instance/
+*.db
+
+# Logs
+*.log
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Environment
+.env
+.env.local
+
+# Stream URLs
+stream_URL.txt
