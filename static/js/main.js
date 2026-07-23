@@ -34,6 +34,15 @@ function formatTime(seconds) {
   return `${minutes}:${String(secs).padStart(2, '0')}`;
 }
 
+function formatSampleRate(sampleRate) {
+  const rate = typeof sampleRate === 'string' ? parseFloat(sampleRate) : sampleRate;
+  if (!rate || isNaN(rate)) return `${sampleRate}`;
+
+  const khz = rate >= 1000 ? rate / 1000 : rate;
+  const formatted = khz % 1 === 0 ? khz.toString() : khz.toFixed(1);
+  return `${formatted}kHz`;
+}
+
 async function fetchAndUpdateMetadata() {
   try {
     console.log('Fetching metadata from:', METADATA_URL);
@@ -49,13 +58,16 @@ async function fetchAndUpdateMetadata() {
     trackTitle.textContent = data.title || '—';
     bannerText.textContent = (data.artist || '—').toUpperCase();
 
-    let metaText = '';
-    if (data.album) metaText += data.album;
-    if (data.date) metaText += metaText ? ` • ${data.date}` : data.date;
-    if (data.sample_rate) metaText += metaText ? ` • ${data.sample_rate}Hz` : `${data.sample_rate}Hz`;
-    if (data.bit_depth) metaText += metaText ? ` • ${data.bit_depth}-bit` : `${data.bit_depth}-bit`;
+    const metaParts = [];
+    if (data.album) metaParts.push(data.album);
+    if (data.date) metaParts.push(data.date);
 
-    trackMeta.textContent = metaText || '—';
+    const qualityParts = [];
+    if (data.bit_depth) qualityParts.push(`${data.bit_depth}-bit`);
+    if (data.sample_rate) qualityParts.push(formatSampleRate(data.sample_rate));
+    if (qualityParts.length) metaParts.push(qualityParts.join('/'));
+
+    trackMeta.textContent = metaParts.join(' • ') || '—';
 
     const coverImage = document.getElementById('coverImage');
     coverImage.src = 'https://d3d4yli4hf5bmh.cloudfront.net/cover.jpg?t=' + Date.now();
