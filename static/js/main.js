@@ -21,6 +21,8 @@ const METADATA_URL = 'https://d3d4yli4hf5bmh.cloudfront.net/metadatav2.json';
 const API_BASE = '/api';
 
 let currentTrackId = null;
+let lastMetadata = null;
+let currentAudioQuality = null;
 
 function formatTime(seconds) {
   if (!seconds || isNaN(seconds)) return '0:00';
@@ -43,6 +45,61 @@ function formatSampleRate(sampleRate) {
   return `${formatted}kHz`;
 }
 
+// The metadata JSON's bit_depth/sample_rate describe the source master
+// (always ~48kHz FLAC), not necessarily what HLS is actually delivering —
+// HLS adaptively switches between a lossless FLAC rendition and a lossy
+// ~192kbps VBR MP3 rendition based on the client's bandwidth. Inspect the
+// active hls.js level/audio track to find out which is really playing.
+function detectAudioQuality() {
+  if (!hls) return null;
+
+  const level = hls.levels && hls.levels[hls.currentLevel];
+  const track = hls.audioTracks && hls.audioTracks[hls.audioTrack];
+
+  const codec = (
+    (track && track.attrs && track.attrs.CODECS) ||
+    (level && level.audioCodec) ||
+    (level && level.attrs && level.attrs.CODECS) ||
+    ''
+  ).toLowerCase();
+
+  const bitrate = (level && level.bitrate) || (track && track.bitrate) || null;
+
+  if (codec.includes('flac') || codec.includes('alac') || codec.includes('pcm')) {
+    return { lossless: true };
+  }
+  if (bitrate && bitrate > 500000) {
+    // Lossless FLAC bitrates run well above typical lossy streaming bitrates
+    return { lossless: true };
+  }
+  if (codec || bitrate) {
+    return { lossless: false, bitrateKbps: bitrate ? Math.round(bitrate / 1000) : null };
+  }
+  return null;
+}
+
+function renderTrackMeta() {
+  if (!lastMetadata) return;
+
+  const metaParts = [];
+  if (lastMetadata.album) metaParts.push(lastMetadata.album);
+  if (lastMetadata.date) metaParts.push(lastMetadata.date);
+
+  const qualityParts = [];
+  if (currentAudioQuality && currentAudioQuality.lossless === false) {
+    const kbps = currentAudioQuality.bitrateKbps || 192;
+    qualityParts.push(`${kbps}kbps MP3`);
+  } else {
+    const specParts = [];
+    if (lastMetadata.bit_depth) specParts.push(`${lastMetadata.bit_depth}-bit`);
+    if (lastMetadata.sample_rate) specParts.push(formatSampleRate(lastMetadata.sample_rate));
+    if (specParts.length) qualityParts.push(`${specParts.join('/')} FLAC`);
+  }
+  if (qualityParts.length) metaParts.push(qualityParts.join('/'));
+
+  trackMeta.textContent = metaParts.join(' • ') || '—';
+}
+
 async function fetchAndUpdateMetadata() {
   try {
     console.log('Fetching metadata from:', METADATA_URL);
@@ -54,20 +111,13 @@ async function fetchAndUpdateMetadata() {
     const data = await response.json();
     console.log('Metadata fetched:', data);
 
+    lastMetadata = data;
+
     artistName.textContent = data.artist || '—';
     trackTitle.textContent = data.title || '—';
     bannerText.textContent = (data.artist || '—').toUpperCase();
 
-    const metaParts = [];
-    if (data.album) metaParts.push(data.album);
-    if (data.date) metaParts.push(data.date);
-
-    const qualityParts = [];
-    if (data.bit_depth) qualityParts.push(`${data.bit_depth}-bit`);
-    if (data.sample_rate) qualityParts.push(formatSampleRate(data.sample_rate));
-    if (qualityParts.length) metaParts.push(qualityParts.join('/'));
-
-    trackMeta.textContent = metaParts.join(' • ') || '—';
+    renderTrackMeta();
 
     const coverImage = document.getElementById('coverImage');
     coverImage.src = 'https://d3d4yli4hf5bmh.cloudfront.net/cover.jpg?t=' + Date.now();
@@ -195,6 +245,14 @@ function initHLS() {
     hls.attachMedia(player);
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
       statusText.textContent = 'Stream loaded. Ready to play.';
+    });
+    hls.on(Hls.Events.LEVEL_SWITCHED, () => {
+      currentAudioQuality = detectAudioQuality();
+      renderTrackMeta();
+    });
+    hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, () => {
+      currentAudioQuality = detectAudioQuality();
+      renderTrackMeta();
     });
     hls.on(Hls.Events.ERROR, (event, data) => {
       if (data.type === 'networkError') {
