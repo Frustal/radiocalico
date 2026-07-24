@@ -228,17 +228,17 @@ let elapsedAtPause = 0;
 function initHLS() {
   if (Hls.isSupported()) {
     const hlsConfig = {
-      maxBufferLength: 1.5,
-      maxMaxBufferLength: 3,
+      maxBufferLength: 30,
+      maxMaxBufferLength: 60,
       maxBufferSize: 20 * 1000 * 1000,
-      maxBufferHole: 0.15,
-      lowLatencyMode: true,
+      maxBufferHole: 0.5,
+      lowLatencyMode: false,
       backBufferLength: 30,
-      manifestLoadingTimeOut: 3000,
-      manifestLoadingRetryDelay: 300,
-      levelLoadingTimeOut: 3000,
-      fragLoadingTimeOut: 8000,
-      fragLoadingErrorRetry: { retryDelayMs: 200, maxNumRetry: 3 },
+      manifestLoadingTimeOut: 10000,
+      manifestLoadingRetryDelay: 1000,
+      levelLoadingTimeOut: 10000,
+      fragLoadingTimeOut: 20000,
+      fragLoadingErrorRetry: { retryDelayMs: 500, maxNumRetry: 6 },
     };
     hls = new Hls(hlsConfig);
     hls.loadSource(HLS_URL);
