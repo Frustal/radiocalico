@@ -6,7 +6,7 @@
 
 body {
   font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #FFFFFF;
+  background: #E3F2FD;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -52,7 +52,7 @@ body {
 /* Main Container */
 .main-container {
   flex: 1;
-  background: white;
+  background: #E3F2FD;
   padding: 20px;
 }
 
