@@ -112,18 +112,13 @@ RUN pip install gunicorn
 
 # Copy and configure nginx
 COPY nginx/nginx.conf /etc/nginx/sites-available/default
-RUN mkdir -p /var/log/nginx /var/cache/nginx && \
-    chown -R www-data:www-data /var/log/nginx /var/cache/nginx
+RUN mkdir -p /var/log/nginx /var/cache/nginx /var/lib/nginx/body /var/lib/nginx/fastcgi /var/lib/nginx/proxy /var/lib/nginx/scgi /var/lib/nginx/uwsgi
 
 # Create instance directory for SQLite (if used)
 RUN mkdir -p instance
 
-# Create non-root user for security
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app && \
-    chown -R appuser:appuser /var/log/nginx /var/cache/nginx && \
-    mkdir -p /var/run/nginx && chown -R appuser:appuser /var/run/nginx
-
-USER appuser
+# Create non-root user for Flask
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 
 # Expose ports
 EXPOSE 80 5000
