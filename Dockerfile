@@ -25,7 +25,7 @@ RUN pip install --upgrade pip setuptools wheel && \
 # ============================================================================
 # Stage 2: Node.js dependencies builder
 # ============================================================================
-FROM node:18-alpine AS node-builder
+FROM node:22-alpine AS node-builder
 
 WORKDIR /build
 
@@ -44,18 +44,20 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
+    gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js in Python image
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    nodejs npm \
-    && rm -rf /var/lib/apt/lists/*
+# Install Node.js (NodeSource, Debian's apt package is too old for current jsdom/undici)
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy Python venv from builder
 COPY --from=python-builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app \
     FLASK_ENV=development \
     FLASK_APP=main.py
 
@@ -100,18 +102,20 @@ WORKDIR /app
 # Install runtime dependencies only (no dev tools)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    nodejs \
-    && rm -rf /var/lib/apt/lists/*
+# Install Node.js (NodeSource, Debian's apt package is too old for current jsdom/undici)
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy Python venv from builder
 COPY --from=python-builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app \
     FLASK_ENV=production
 
 # Copy Node.js dependencies from builder
