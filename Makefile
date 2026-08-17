@@ -48,56 +48,56 @@ env:
 
 build:
 	@echo "$(BLUE)Building development image...$(NC)"
-	docker-compose build
+	docker compose build
 
 up: build
 	@echo "$(BLUE)Starting development containers...$(NC)"
-	docker-compose up
+	docker compose up
 
 down:
 	@echo "$(BLUE)Stopping development containers...$(NC)"
-	docker-compose down
+	docker compose down
 
 logs:
-	docker-compose logs -f radiocalico
+	docker compose logs -f radiocalico
 
 shell:
-	docker-compose exec radiocalico bash
+	docker compose exec radiocalico bash
 
 test:
 	@echo "$(BLUE)Running tests...$(NC)"
-	docker-compose exec radiocalico pytest
+	docker compose exec radiocalico pytest
 
 migrate:
 	@echo "$(BLUE)Running database migrations...$(NC)"
-	docker-compose exec radiocalico python -m flask --app main db upgrade
+	docker compose exec radiocalico python -m flask --app main db upgrade
 
 # Production targets
 build-prod:
 	@echo "$(BLUE)Building production image...$(NC)"
-	docker-compose -f docker-compose.prod.yml build
+	docker compose -f docker-compose.prod.yml build
 
 up-prod: build-prod
 	@echo "$(BLUE)Starting production containers...$(NC)"
-	docker-compose -f docker-compose.prod.yml up -d
+	docker compose -f docker-compose.prod.yml up -d
 	@echo "$(GREEN)Production containers started!$(NC)"
 	@echo "$(BLUE)View logs with: make logs-prod$(NC)"
 
 down-prod:
 	@echo "$(BLUE)Stopping production containers...$(NC)"
-	docker-compose -f docker-compose.prod.yml down
+	docker compose -f docker-compose.prod.yml down
 
 logs-prod:
-	docker-compose -f docker-compose.prod.yml logs -f radiocalico
+	docker compose -f docker-compose.prod.yml logs -f radiocalico
 
 shell-prod:
-	docker-compose -f docker-compose.prod.yml exec radiocalico bash
+	docker compose -f docker-compose.prod.yml exec radiocalico bash
 
 # Database backup/restore (PostgreSQL)
 backup:
 	@echo "$(BLUE)Backing up development PostgreSQL database...$(NC)"
 	@mkdir -p ./backups
-	docker-compose exec -T postgres pg_dump -U radiocalico radiocalico | gzip > ./backups/backup-dev-$(shell date +%Y%m%d-%H%M%S).sql.gz
+	docker compose exec -T postgres pg_dump -U radiocalico radiocalico | gzip > ./backups/backup-dev-$(shell date +%Y%m%d-%H%M%S).sql.gz
 	@echo "$(GREEN)Backup created in ./backups/$(NC)"
 
 restore:
@@ -108,13 +108,13 @@ restore:
 		exit 1; \
 	fi
 	@echo "$(BLUE)Restoring from $(BACKUP_FILE)...$(NC)"
-	gunzip -c $(BACKUP_FILE) | docker-compose exec -T postgres psql -U radiocalico radiocalico
+	gunzip -c $(BACKUP_FILE) | docker compose exec -T postgres psql -U radiocalico radiocalico
 	@echo "$(GREEN)Database restored!$(NC)"
 
 backup-prod:
 	@echo "$(BLUE)Backing up production PostgreSQL database...$(NC)"
 	@mkdir -p ./backups
-	docker-compose -f docker-compose.prod.yml exec -T postgres pg_dump -U radiocalico radiocalico | gzip > ./backups/backup-prod-$(shell date +%Y%m%d-%H%M%S).sql.gz
+	docker compose -f docker-compose.prod.yml exec -T postgres pg_dump -U radiocalico radiocalico | gzip > ./backups/backup-prod-$(shell date +%Y%m%d-%H%M%S).sql.gz
 	@echo "$(GREEN)Backup created in ./backups/$(NC)"
 
 restore-prod:
@@ -125,17 +125,17 @@ restore-prod:
 		exit 1; \
 	fi
 	@echo "$(BLUE)Restoring production from $(BACKUP_FILE)...$(NC)"
-	gunzip -c $(BACKUP_FILE) | docker-compose -f docker-compose.prod.yml exec -T postgres psql -U radiocalico radiocalico
+	gunzip -c $(BACKUP_FILE) | docker compose -f docker-compose.prod.yml exec -T postgres psql -U radiocalico radiocalico
 	@echo "$(GREEN)Production database restored!$(NC)"
 
 db-shell:
-	docker-compose exec postgres psql -U radiocalico radiocalico
+	docker compose exec postgres psql -U radiocalico radiocalico
 
 # Utility targets
 clean:
 	@echo "$(RED)Removing containers and volumes...$(NC)"
-	docker-compose down -v
-	docker-compose -f docker-compose.prod.yml down -v
+	docker compose down -v
+	docker compose -f docker-compose.prod.yml down -v
 	@echo "$(GREEN)Cleanup complete$(NC)"
 
 prune:
@@ -145,10 +145,10 @@ prune:
 
 ps:
 	@echo "$(BLUE)Development containers:$(NC)"
-	docker-compose ps
+	docker compose ps
 	@echo ""
 	@echo "$(BLUE)Production containers:$(NC)"
-	docker-compose -f docker-compose.prod.yml ps
+	docker compose -f docker-compose.prod.yml ps
 
 stats:
 	docker stats radiocalico
