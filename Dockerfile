@@ -120,7 +120,8 @@ RUN mkdir -p instance
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app && \
-    chown -R appuser:appuser /var/log/nginx /var/cache/nginx /var/run/nginx
+    chown -R appuser:appuser /var/log/nginx /var/cache/nginx && \
+    mkdir -p /var/run/nginx && chown -R appuser:appuser /var/run/nginx
 
 USER appuser
 
