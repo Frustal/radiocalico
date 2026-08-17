@@ -30,11 +30,28 @@ radiocalico/
 ├── migrations/                   # Flask-Migrate database schema
 ├── instance/                     # Runtime data (database, ignored in git)
 │   └── radiocalico.db           # SQLite database
+├── nginx/                        # Nginx reverse proxy configuration
+│   └── nginx.conf               # Production nginx config
+├── scripts/                      # Helper scripts
+│   └── generate-secret-key.sh   # Generate secure Flask SECRET_KEY
+├── .github/workflows/            # CI/CD pipeline
+│   └── docker-build.yml         # Automated Docker build & test
 ├── main.py                       # Flask app entry point
 ├── server.js                     # Express.js entry point
 ├── package.json                  # Node.js dependencies
 ├── pyproject.toml                # Python package config
+├── Dockerfile                    # Multi-stage Docker build (dev & prod)
+├── docker-compose.yml            # Development Docker Compose config
+├── docker-compose.prod.yml       # Production Docker Compose config
+├── docker-compose.prod-with-nginx.yml  # Production with nginx
+├── docker-entrypoint.sh          # Container initialization script
+├── .dockerignore                 # Docker build exclusions
+├── .env.example                  # Environment variables template
+├── Makefile                      # Simplified command interface
 ├── CLAUDE.md                     # This file
+├── DOCKER.md                     # Comprehensive Docker guide
+├── DOCKER_QUICK_START.md         # Docker quick reference
+├── DEPLOYMENT_CHECKLIST.md       # Pre-deployment checklist
 ├── RadioCalico_Style_Guide.txt   # Brand style guide
 ├── RadioCalicoLogoTM.png         # Brand logo
 └── RadioCalicoStyle.zip          # Styling assets
@@ -64,7 +81,38 @@ radiocalico/
 
 ## Development Commands
 
-### Install Dependencies
+### Option 1: Docker (Recommended)
+
+The project is fully containerized with Docker for development and production deployments.
+
+**Quick Start:**
+```bash
+# Create environment file
+make env
+
+# Start development containers (Flask + Express + SQLite in one container)
+make up
+
+# Access at http://localhost:3000
+```
+
+**Useful Commands:**
+```bash
+make build              # Build development image
+make down               # Stop containers
+make logs               # View container logs
+make shell              # Enter container shell
+make test               # Run tests
+make migrate            # Apply database migrations
+make backup             # Backup database
+make up-prod            # Start production containers
+```
+
+See `DOCKER.md` and `DOCKER_QUICK_START.md` for complete Docker documentation.
+
+### Option 2: Local Installation
+
+**Install Dependencies**
 ```bash
 # Python backend
 python -m pip install -e .
@@ -74,19 +122,19 @@ python -m pip install flask flask-migrate flask-sqlalchemy
 npm install
 ```
 
-### Initialize Database (first run only)
+**Initialize Database (first run only)**
 ```bash
 # Create instance/ dir and init database schema
 python -m flask --app main db upgrade
 ```
 
-### Run Both Servers (concurrent)
+**Run Both Servers (concurrent)**
 ```bash
 # Terminal 1: Flask backend (port 5000)
 python main.py
 
 # Terminal 2: Express.js frontend (port 3000)
-npm start& - to run in the background
+npm start
 ```
 Then visit `http://localhost:3000` in browser.
 
@@ -162,8 +210,54 @@ Currently no test suite. `test-buttons.js` appears to be an exploratory test fil
 - Node.js 18+ (inferred from package.json)
 - SQLite (included with Python)
 
+## Docker Deployment
+
+Radio Calico is fully containerized for both development and production use.
+
+### Docker Images
+- **Development**: ~850MB (includes debug tools, test runners, live reload)
+- **Production**: ~420MB (optimized for size, gunicorn WSGI server, non-root user)
+
+### Quick Docker Commands
+```bash
+make env                 # Create .env file
+make up                  # Start dev (http://localhost:3000)
+make down                # Stop dev
+make up-prod             # Start production
+make backup              # Backup database
+make restore FILE=...    # Restore from backup
+make logs                # View container logs
+```
+
+### Deployment Options
+1. **Simple** (default): `make up-prod` - Direct Express/Gunicorn on ports 3000/5000
+2. **With Nginx** (recommended): Use `docker-compose.prod-with-nginx.yml` for reverse proxy, SSL/TLS, rate limiting
+3. **Advanced**: Add PostgreSQL, Redis caching, load balancing (see `DOCKER.md`)
+
+### Important Docker Files
+- `Dockerfile` - Multi-stage build (development and production targets)
+- `docker-compose.yml` - Development configuration with volume mounts
+- `docker-compose.prod.yml` - Production configuration with resource limits
+- `docker-entrypoint.sh` - Database initialization and server startup
+- `Makefile` - 48 useful commands for building, running, testing, backing up
+- `DOCKER.md` - Complete 200+ section Docker documentation
+- `DEPLOYMENT_CHECKLIST.md` - Pre-deployment verification guide
+
+### Docker Best Practices Implemented
+- ✅ Multi-stage builds (separate dependencies from app code)
+- ✅ Health checks on all containers
+- ✅ Non-root user in production
+- ✅ Resource limits and restart policies
+- ✅ Automatic database migrations on startup
+- ✅ Structured logging with rotation
+- ✅ Volume persistence for database
+- ✅ CI/CD pipeline with GitHub Actions
+
 ## Production Considerations
-- Change `secret_key` in `app/__init__.py` before deploying
-- Migrate to PostgreSQL or MySQL for production
-- Add request logging / monitoring
-- Implement rate-limiting on `/api/ratings` endpoints to prevent abuse
+- Change `secret_key` in `app/__init__.py` before deploying (or generate with `bash scripts/generate-secret-key.sh`)
+- Consider PostgreSQL or MySQL for production instead of SQLite
+- Use `docker-compose.prod-with-nginx.yml` for SSL/TLS and reverse proxy
+- Set up automated backups: `make backup-prod` (via cron)
+- Monitor container health and logs
+- Implement rate-limiting on `/api/ratings` endpoints (nginx config included)
+- See `DEPLOYMENT_CHECKLIST.md` for full pre-deployment verification

@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  radiocalico:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: radiocalico-dev
+    ports:
+      - "3000:3000"  # Express frontend
+      - "5000:5000"  # Flask backend
+    volumes:
+      # Mount source code for live reloading
+      - .:/app
+      - /app/node_modules  # Don't override node_modules with host volume
+    environment:
+      # Flask configuration
+      FLASK_APP: main.py
+      FLASK_ENV: development
+      FLASK_DEBUG: "1"
+
+      # Python configuration
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+
+      # Node.js configuration
+      NODE_ENV: development
+      PORT: 3000
+
+      # Database (relative to container working directory)
+      DATABASE_URL: sqlite:///instance/radiocalico.db
+
+    # Keep container running even if services crash
+    restart: unless-stopped
+
+    # Interactive terminal for debugging
+    stdin_open: true
+    tty: true

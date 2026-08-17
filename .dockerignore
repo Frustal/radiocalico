@@ -1,0 +1,48 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Dependencies
+node_modules
+__pycache__
+*.egg-info
+.pytest_cache
+.venv
+venv
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation
+*.md
+!README.md
+LICENSE
+
+# Testing
+test-*.js
+pytest.ini
+.vitest
+coverage
+
+# Runtime
+instance/radiocalico.db
+*.log
+.env
+.env.local
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Other
+.editorconfig
+*.zip
+*.tar
+*.tar.gz
