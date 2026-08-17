@@ -6,10 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Radio Calico is a streaming radio app with a rating system. It's a two-tier full-stack app:
 
-- **Frontend**: Express.js (Node.js) serves static HTML/CSS/JS and proxies API calls
-- **Backend**: Flask API with SQLAlchemy ORM and SQLite database
+- **Frontend**: Nginx serves static HTML/CSS/JS and proxies API calls to Flask
+- **Backend**: Flask API with SQLAlchemy ORM and PostgreSQL database
 
-Both tiers run concurrently during development (see "Development Commands" below).
+Both tiers run concurrently in a single container during development, with PostgreSQL in a separate container.
 
 ## Project Structure
 
@@ -28,17 +28,14 @@ radiocalico/
 │       ├── main.js              # Core app logic
 │       └── debug.js             # Debug utilities
 ├── migrations/                   # Flask-Migrate database schema
-├── instance/                     # Runtime data (database, ignored in git)
-│   └── radiocalico.db           # SQLite database
-├── nginx/                        # Nginx reverse proxy configuration
-│   └── nginx.conf               # Production nginx config
+├── instance/                     # Runtime data (SQLite database if used, ignored in git)
+├── nginx/                        # Nginx configuration
+│   └── nginx.conf               # Nginx reverse proxy & static file server config
 ├── scripts/                      # Helper scripts
 │   └── generate-secret-key.sh   # Generate secure Flask SECRET_KEY
 ├── .github/workflows/            # CI/CD pipeline
 │   └── docker-build.yml         # Automated Docker build & test
 ├── main.py                       # Flask app entry point
-├── server.js                     # Express.js entry point
-├── package.json                  # Node.js dependencies
 ├── pyproject.toml                # Python package config
 ├── Dockerfile                    # Multi-stage Docker build (dev & prod)
 ├── docker-compose.yml            # Development Docker Compose config
@@ -59,15 +56,15 @@ radiocalico/
 
 ## Architecture
 
-### Frontend (Express.js, port 3000)
-- `server.js` - Entry point. Serves static files from `static/` and proxies `/api/**` requests to Flask
+### Frontend (Nginx, port 80/3000)
+- `nginx/nginx.conf` - Configuration. Serves static files from `static/` and proxies `/api/**` requests to Flask on port 5000
 - `static/index.html` - Single-page app structure. Audio player, rating controls, metadata display
 - `static/js/main.js` - Frontend logic. Handles HLS audio streaming (from CloudFront), metadata fetching, rating button interactions, recently-played list
 - `static/css/main.css` - Styling (Radio Calico brand theme)
 
 ### Backend (Flask, port 5000)
 - `main.py` - Entry point. Creates Flask app and runs on port 5000
-- `app/__init__.py` - Flask app factory. Initializes SQLAlchemy, Flask-Migrate, and registers blueprints
+- `app/__init__.py` - Flask app factory. Initializes SQLAlchemy, Flask-Migrate, and registers blueprints. Supports both PostgreSQL and SQLite via DATABASE_URL environment variable
 - `app/models.py` - Single ORM model: `Rating` (tracks user thumbs-up/down ratings per track)
 - `app/api/ratings.py` - REST endpoints:
   - `GET /api/ratings/<track_id>` - returns up/down counts + user's rating (by IP)
@@ -75,7 +72,8 @@ radiocalico/
   - `GET /api/ratings` - list all ratings (paginated or full dump)
 
 ### Database
-- SQLite file: `instance/radiocalico.db` (created at runtime if missing)
+- **Production**: PostgreSQL 16 (in separate container)
+- **Development**: PostgreSQL 16 (in separate container) or SQLite (if DATABASE_URL not set)
 - Schema managed by Flask-Migrate (see `migrations/` directory)
 - Single table: `rating` with unique constraint on (track_id, user_ip) to enforce one rating per user per track
 
@@ -90,7 +88,7 @@ The project is fully containerized with Docker for development and production de
 # Create environment file
 make env
 
-# Start development containers (Flask + Express + SQLite in one container)
+# Start development containers (Flask + Nginx + PostgreSQL)
 make up
 
 # Access at http://localhost:3000
@@ -101,42 +99,50 @@ make up
 make build              # Build development image
 make down               # Stop containers
 make logs               # View container logs
-make shell              # Enter container shell
-make test               # Run tests
+make shell              # Enter container shell (radiocalico app)
+make test               # Run pytest tests
 make migrate            # Apply database migrations
-make backup             # Backup database
+make backup             # Backup PostgreSQL database
+make db-shell           # Access PostgreSQL shell
 make up-prod            # Start production containers
 ```
 
 See `DOCKER.md` and `DOCKER_QUICK_START.md` for complete Docker documentation.
 
-### Option 2: Local Installation
+### Option 2: Local Installation (Advanced)
 
 **Install Dependencies**
 ```bash
 # Python backend
 python -m pip install -e .
-python -m pip install flask flask-migrate flask-sqlalchemy
-
-# Node.js frontend
-npm install
+pip install flask flask-migrate flask-sqlalchemy psycopg2-binary
 ```
 
 **Initialize Database (first run only)**
 ```bash
-# Create instance/ dir and init database schema
+# For PostgreSQL development:
+# 1. Create a PostgreSQL database (requires local PostgreSQL server)
+# 2. Set DATABASE_URL environment variable: postgresql://user:password@localhost:5432/radiocalico
+# 3. Run migrations:
+python -m flask --app main db upgrade
+
+# Or for SQLite (no server needed):
+# Leave DATABASE_URL unset and use SQLite
+mkdir -p instance
 python -m flask --app main db upgrade
 ```
 
-**Run Both Servers (concurrent)**
+**Run Servers (requires nginx)**
 ```bash
 # Terminal 1: Flask backend (port 5000)
 python main.py
 
-# Terminal 2: Express.js frontend (port 3000)
-npm start
+# Terminal 2: Nginx frontend (requires nginx installation on your system)
+# On macOS: brew install nginx
+# On Linux: apt-get install nginx
+# Then start nginx with config: nginx -c $(pwd)/nginx/nginx.conf -p $(pwd)/
 ```
-Then visit `http://localhost:3000` in browser.
+Then visit `http://localhost` in browser. Note: Local nginx setup is complex; Docker is recommended.
 
 ### Database Migrations
 ```bash
@@ -180,9 +186,10 @@ Frontend files are organized under `static/`:
 All CSS and JavaScript are externalized into separate files (no inline `<style>` or `<script>` tags in HTML).
 
 ## Key Dependencies
-- **Backend**: Flask 3.1.3, Flask-SQLAlchemy 3.1.1, Flask-Migrate 4.1.0
-- **Frontend**: Express 5.2.1, http-proxy-middleware 4.1.1
-- **Audio**: HLS.js (from CDN in index.html)
+- **Backend**: Flask 3.1.3, Flask-SQLAlchemy 3.1.1, Flask-Migrate 4.1.0, psycopg2-binary 2.9.0
+- **Database**: PostgreSQL 16 (production), SQLite (optional for development)
+- **Frontend**: Nginx (reverse proxy + static file server), HLS.js (from CDN in index.html)
+- **Server**: Gunicorn (production WSGI server for Flask)
 
 ## External APIs / Resources
 - Metadata: `https://d3d4yli4hf5bmh.cloudfront.net/metadatav2.json` (current track info)

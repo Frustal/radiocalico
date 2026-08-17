@@ -1,19 +1,39 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: radiocalico-postgres-dev
+    environment:
+      POSTGRES_DB: radiocalico
+      POSTGRES_USER: radiocalico
+      POSTGRES_PASSWORD: dev-password-change-in-prod
+    volumes:
+      - postgres-data-dev:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U radiocalico"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   radiocalico:
     build:
       context: .
       dockerfile: Dockerfile
       target: development
     container_name: radiocalico-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
-      - "3000:3000"  # Express frontend
-      - "5000:5000"  # Flask backend
+      - "3000:80"   # Nginx frontend
+      - "5000:5000" # Flask backend (for debugging)
     volumes:
       # Mount source code for live reloading
       - .:/app
-      - /app/node_modules  # Don't override node_modules with host volume
     environment:
       # Flask configuration
       FLASK_APP: main.py
@@ -24,12 +44,11 @@ services:
       PYTHONUNBUFFERED: "1"
       PYTHONDONTWRITEBYTECODE: "1"
 
-      # Node.js configuration
-      NODE_ENV: development
-      PORT: 3000
+      # Database: PostgreSQL in development
+      DATABASE_URL: postgresql://radiocalico:dev-password-change-in-prod@postgres:5432/radiocalico
 
-      # Database (relative to container working directory)
-      DATABASE_URL: sqlite:///instance/radiocalico.db
+      # Application secret
+      SECRET_KEY: dev-secret-change-in-prod
 
     # Keep container running even if services crash
     restart: unless-stopped
@@ -37,3 +56,7 @@ services:
     # Interactive terminal for debugging
     stdin_open: true
     tty: true
+
+volumes:
+  postgres-data-dev:
+    driver: local

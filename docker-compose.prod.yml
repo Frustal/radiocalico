@@ -1,6 +1,30 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: radiocalico-postgres-prod
+    environment:
+      POSTGRES_DB: radiocalico
+      POSTGRES_USER: radiocalico
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-this-in-production}
+    volumes:
+      - postgres-data-prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U radiocalico"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
   radiocalico:
     build:
       context: .
@@ -8,12 +32,11 @@ services:
       target: production
     container_name: radiocalico-prod
     image: radiocalico:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
-      - "3000:3000"  # Express frontend (or map to 80 via reverse proxy)
-      - "5000:5000"  # Flask backend (internal only, not exposed in production)
-    volumes:
-      # Only mount instance directory for database persistence
-      - radiocalico-data:/app/instance
+      - "3000:80"   # Nginx frontend (map to 80 for reverse proxy in production)
     environment:
       # Flask configuration
       FLASK_APP: main.py
@@ -23,12 +46,8 @@ services:
       PYTHONUNBUFFERED: "1"
       PYTHONDONTWRITEBYTECODE: "1"
 
-      # Node.js configuration
-      NODE_ENV: production
-      PORT: 3000
-
-      # Database persistence
-      DATABASE_URL: sqlite:////app/instance/radiocalico.db
+      # Database: PostgreSQL in production
+      DATABASE_URL: postgresql://radiocalico:${POSTGRES_PASSWORD:-change-this-in-production}@postgres:5432/radiocalico
 
       # Security: Change this in production!
       SECRET_KEY: ${SECRET_KEY:-change-this-in-production}
@@ -54,7 +73,7 @@ services:
         max-file: "3"
 
 volumes:
-  radiocalico-data:
+  postgres-data-prod:
     driver: local
 
 networks:
