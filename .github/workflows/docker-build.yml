@@ -69,8 +69,6 @@ jobs:
             ${{ steps.image.outputs.full_name }}:dev-latest
             ${{ steps.image.outputs.full_name }}:dev-${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ steps.image.outputs.full_name }}:buildcache-dev
-          cache-to: type=registry,ref=${{ steps.image.outputs.full_name }}:buildcache-dev,mode=max
 
       - name: Build and push (Prod)
         uses: docker/build-push-action@v5
@@ -80,8 +78,6 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ steps.image.outputs.full_name }}:buildcache
-          cache-to: type=registry,ref=${{ steps.image.outputs.full_name }}:buildcache,mode=max
 
   test:
     runs-on: ubuntu-latest
