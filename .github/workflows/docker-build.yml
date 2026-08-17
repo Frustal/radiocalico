@@ -47,17 +47,6 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ steps.image.outputs.full_name }}
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push (Dev)
         uses: docker/build-push-action@v5
@@ -76,8 +65,9 @@ jobs:
           context: .
           target: production
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ steps.image.outputs.full_name }}:${{ github.ref_name }}
+            ${{ steps.image.outputs.full_name }}:${{ github.ref_name }}-${{ github.sha }}
 
   test:
     runs-on: ubuntu-latest
