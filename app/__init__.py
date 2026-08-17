@@ -6,11 +6,14 @@ db = SQLAlchemy()
 migrate = Migrate()
 
 
-def create_app():
+def create_app(test_config=None):
     app = Flask(__name__, static_folder="../static")
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///radiocalico.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.secret_key = "dev-secret-change-in-prod"
+
+    if test_config:
+        app.config.update(test_config)
 
     db.init_app(app)
     migrate.init_app(app, db)
