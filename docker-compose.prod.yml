@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  radiocalico:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: radiocalico-prod
+    image: radiocalico:latest
+    ports:
+      - "3000:3000"  # Express frontend (or map to 80 via reverse proxy)
+      - "5000:5000"  # Flask backend (internal only, not exposed in production)
+    volumes:
+      # Only mount instance directory for database persistence
+      - radiocalico-data:/app/instance
+    environment:
+      # Flask configuration
+      FLASK_APP: main.py
+      FLASK_ENV: production
+
+      # Python configuration
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+
+      # Node.js configuration
+      NODE_ENV: production
+      PORT: 3000
+
+      # Database persistence
+      DATABASE_URL: sqlite:////app/instance/radiocalico.db
+
+      # Security: Change this in production!
+      SECRET_KEY: ${SECRET_KEY:-change-this-in-production}
+
+    # Restart policy for production
+    restart: always
+
+    # Resource limits (adjust based on your infrastructure)
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  radiocalico-data:
+    driver: local
+
+networks:
+  default:
+    name: radiocalico-network
