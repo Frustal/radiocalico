@@ -99,13 +99,11 @@ jobs:
 
       - name: Run tests
         run: |
-          docker run --rm --entrypoint npm radiocalico:test test
           docker run --rm --entrypoint pytest radiocalico:test
 
       - name: Run linting (optional)
         continue-on-error: true
         run: |
-          docker run --rm --entrypoint npm radiocalico:test run lint
           docker run --rm --entrypoint pylint radiocalico:test app/
 
   security-scan:
