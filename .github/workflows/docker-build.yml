@@ -97,14 +97,20 @@ jobs:
           load: true
           tags: radiocalico:test
 
-      - name: Run tests
+      - name: Run tests (using make test-ci)
         run: |
-          docker run --rm --entrypoint pytest radiocalico:test
+          make test-ci
 
       - name: Run linting (optional)
         continue-on-error: true
         run: |
           docker run --rm --entrypoint pylint radiocalico:test app/
+
+      - name: Run security scans (using make targets)
+        continue-on-error: true
+        run: |
+          make security-npm-ci
+          make security-python-ci
 
   security-scan:
     runs-on: ubuntu-latest
