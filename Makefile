@@ -73,7 +73,7 @@ test:
 	@echo "$(BLUE)Running tests...$(NC)"
 	docker compose exec radiocalico pytest
 
-# Security targets
+# Security targets (for local development with docker-compose)
 security: security-npm security-python
 	@echo "$(GREEN)All security scans completed!$(NC)"
 
@@ -92,6 +92,19 @@ security-python:
 		exit 1; \
 	}
 	@echo "$(GREEN)pip-audit passed!$(NC)"
+
+# CI targets (for GitHub Actions and other CI environments without docker-compose)
+test-ci:
+	@echo "$(BLUE)Running tests (CI mode)...$(NC)"
+	docker run --rm --entrypoint pytest radiocalico:test
+
+security-npm-ci:
+	@echo "$(BLUE)Running npm audit (CI mode)...$(NC)"
+	docker run --rm --entrypoint npm radiocalico:test audit --audit-level=moderate
+
+security-python-ci:
+	@echo "$(BLUE)Running pip audit (CI mode)...$(NC)"
+	docker run --rm --entrypoint pip-audit radiocalico:test
 
 migrate:
 	@echo "$(BLUE)Running database migrations...$(NC)"
