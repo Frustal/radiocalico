@@ -1,5 +1,6 @@
 # Multi-stage Dockerfile for Radio Calico
-# Supports both development and production builds
+# Backend: Flask (Python) with PostgreSQL support
+# Frontend: Nginx (reverse proxy + static file server)
 
 # ============================================================================
 # Stage 1: Python dependencies builder
@@ -11,6 +12,7 @@ WORKDIR /build
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python project files
@@ -23,34 +25,20 @@ RUN pip install --upgrade pip setuptools wheel && \
     pip install -e .
 
 # ============================================================================
-# Stage 2: Node.js dependencies builder
-# ============================================================================
-FROM node:22-alpine AS node-builder
-
-WORKDIR /build
-
-COPY package*.json ./
-
-RUN npm install --omit=dev
-
-# ============================================================================
-# Stage 3: Development image
+# Stage 2: Development image
 # ============================================================================
 FROM python:3.14-slim AS development
 
 WORKDIR /app
 
-# Install runtime dependencies + development tools
+# Install runtime dependencies + development tools + nginx
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
     gnupg \
+    nginx \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
-
-# Install Node.js (NodeSource, Debian's apt package is too old for current jsdom/undici)
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y --no-install-recommends nodejs && \
-    rm -rf /var/lib/apt/lists/*
 
 # Copy Python venv from builder
 COPY --from=python-builder /opt/venv /opt/venv
@@ -61,10 +49,6 @@ ENV PATH="/opt/venv/bin:$PATH" \
     FLASK_ENV=development \
     FLASK_APP=main.py
 
-# Copy Node.js dependencies from builder
-COPY --from=node-builder /build/node_modules /app/node_modules
-COPY package*.json ./
-
 # Copy application source
 COPY . .
 
@@ -72,18 +56,20 @@ COPY . .
 RUN pip install --upgrade pip && \
     pip install pytest flask-testing watchdog[watchmedo]
 
-# Install dev dependencies for Node.js
-RUN npm install
+# Copy and configure nginx
+COPY nginx/nginx.conf /etc/nginx/sites-available/default
+RUN mkdir -p /var/log/nginx /var/cache/nginx && \
+    chown -R www-data:www-data /var/log/nginx /var/cache/nginx
+
+# Create instance directory for SQLite (if used)
+RUN mkdir -p instance
 
 # Expose ports
-EXPOSE 3000 5000
-
-# Create instance directory for database
-RUN mkdir -p instance
+EXPOSE 80 5000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:3000 || exit 1
+    CMD curl -f http://localhost:80 || exit 1
 
 # Entrypoint script
 COPY docker-entrypoint.sh /
@@ -93,22 +79,19 @@ ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["dev"]
 
 # ============================================================================
-# Stage 4: Production image
+# Stage 3: Production image
 # ============================================================================
 FROM python:3.14-slim AS production
 
 WORKDIR /app
 
-# Install runtime dependencies only (no dev tools)
+# Install runtime dependencies only (nginx + PostgreSQL client)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     gnupg \
+    nginx \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
-
-# Install Node.js (NodeSource, Debian's apt package is too old for current jsdom/undici)
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y --no-install-recommends nodejs && \
-    rm -rf /var/lib/apt/lists/*
 
 # Copy Python venv from builder
 COPY --from=python-builder /opt/venv /opt/venv
@@ -118,32 +101,31 @@ ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONPATH=/app \
     FLASK_ENV=production
 
-# Copy Node.js dependencies from builder
-COPY --from=node-builder /build/node_modules /app/node_modules
-COPY package*.json ./
-
 # Copy application source (production-only files)
 COPY . .
 
 # Remove development files
-RUN rm -rf .git .gitignore pytest.ini test-*.js
+RUN rm -rf .git .gitignore pytest.ini test-*.js server.js package.json node_modules
 
 # Install gunicorn for production Flask serving
 RUN pip install gunicorn
 
-# Create instance directory for database
+# Copy and configure nginx
+COPY nginx/nginx.conf /etc/nginx/sites-available/default
+RUN mkdir -p /var/log/nginx /var/cache/nginx /var/lib/nginx/body /var/lib/nginx/fastcgi /var/lib/nginx/proxy /var/lib/nginx/scgi /var/lib/nginx/uwsgi
+
+# Create instance directory for SQLite (if used)
 RUN mkdir -p instance
 
-# Create non-root user for security
+# Create non-root user for Flask
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
 
 # Expose ports
-EXPOSE 3000 5000
+EXPOSE 80 5000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:3000 || exit 1
+    CMD curl -f http://localhost:80 || exit 1
 
 # Entrypoint script
 COPY --chown=appuser:appuser docker-entrypoint.sh /

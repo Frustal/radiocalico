@@ -1,22 +1,9 @@
 {
   "name": "radiocalico",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "start": "node server.js",
-    "test": "vitest run"
-  },
-  "keywords": [],
-  "author": "",
+  "description": "Radio Calico - streaming radio app with rating system",
   "license": "ISC",
   "type": "commonjs",
-  "dependencies": {
-    "express": "^5.2.1",
-    "http-proxy-middleware": "^4.1.1"
-  },
-  "devDependencies": {
-    "jsdom": "^30.0.1",
-    "vitest": "^4.1.10"
-  }
+  "dependencies": {},
+  "devDependencies": {}
 }

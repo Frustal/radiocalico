@@ -26,11 +26,11 @@ help:
 	@echo "  make shell-prod         - Access production container shell"
 	@echo ""
 	@echo "$(GREEN)Database Commands:$(NC)"
-	@echo "  make backup             - Backup development database"
-	@echo "  make restore            - Restore development database"
-	@echo "  make backup-prod        - Backup production database"
-	@echo "  make restore-prod       - Restore production database"
-	@echo "  make db-shell           - Access database shell"
+	@echo "  make backup             - Backup development PostgreSQL database"
+	@echo "  make restore            - Restore development PostgreSQL database"
+	@echo "  make backup-prod        - Backup production PostgreSQL database"
+	@echo "  make restore-prod       - Restore production PostgreSQL database"
+	@echo "  make db-shell           - Access PostgreSQL shell"
 	@echo ""
 	@echo "$(GREEN)Utility Commands:$(NC)"
 	@echo "  make clean              - Remove containers and volumes"
@@ -48,99 +48,94 @@ env:
 
 build:
 	@echo "$(BLUE)Building development image...$(NC)"
-	docker-compose build
+	docker compose build
 
 up: build
 	@echo "$(BLUE)Starting development containers...$(NC)"
-	docker-compose up
+	docker compose up
 
 down:
 	@echo "$(BLUE)Stopping development containers...$(NC)"
-	docker-compose down
+	docker compose down
 
 logs:
-	docker-compose logs -f radiocalico
+	docker compose logs -f radiocalico
 
 shell:
-	docker-compose exec radiocalico bash
+	docker compose exec radiocalico bash
 
 test:
 	@echo "$(BLUE)Running tests...$(NC)"
-	docker-compose exec radiocalico npm test
-	docker-compose exec radiocalico pytest
+	docker compose exec radiocalico pytest
 
 migrate:
 	@echo "$(BLUE)Running database migrations...$(NC)"
-	docker-compose exec radiocalico python -m flask --app main db upgrade
+	docker compose exec radiocalico python -m flask --app main db upgrade
 
 # Production targets
 build-prod:
 	@echo "$(BLUE)Building production image...$(NC)"
-	docker-compose -f docker-compose.prod.yml build
+	docker compose -f docker-compose.prod.yml build
 
 up-prod: build-prod
 	@echo "$(BLUE)Starting production containers...$(NC)"
-	docker-compose -f docker-compose.prod.yml up -d
+	docker compose -f docker-compose.prod.yml up -d
 	@echo "$(GREEN)Production containers started!$(NC)"
 	@echo "$(BLUE)View logs with: make logs-prod$(NC)"
 
 down-prod:
 	@echo "$(BLUE)Stopping production containers...$(NC)"
-	docker-compose -f docker-compose.prod.yml down
+	docker compose -f docker-compose.prod.yml down
 
 logs-prod:
-	docker-compose -f docker-compose.prod.yml logs -f radiocalico
+	docker compose -f docker-compose.prod.yml logs -f radiocalico
 
 shell-prod:
-	docker-compose -f docker-compose.prod.yml exec radiocalico bash
+	docker compose -f docker-compose.prod.yml exec radiocalico bash
 
-# Database backup/restore
+# Database backup/restore (PostgreSQL)
 backup:
-	@echo "$(BLUE)Backing up development database...$(NC)"
+	@echo "$(BLUE)Backing up development PostgreSQL database...$(NC)"
 	@mkdir -p ./backups
-	docker-compose exec -T radiocalico tar czf - instance/radiocalico.db | gzip > ./backups/backup-dev-$(shell date +%Y%m%d-%H%M%S).tar.gz
+	docker compose exec -T postgres pg_dump -U radiocalico radiocalico | gzip > ./backups/backup-dev-$(shell date +%Y%m%d-%H%M%S).sql.gz
 	@echo "$(GREEN)Backup created in ./backups/$(NC)"
 
 restore:
 	@echo "$(RED)Restore will overwrite existing database!$(NC)"
 	@read -p "Continue? [y/N] " confirm && [ "$${confirm}" = "y" ] || exit 1
 	@if [ -z "$(BACKUP_FILE)" ]; then \
-		echo "$(RED)Usage: make restore BACKUP_FILE=./backups/backup-*.tar.gz$(NC)"; \
+		echo "$(RED)Usage: make restore BACKUP_FILE=./backups/backup-*.sql.gz$(NC)"; \
 		exit 1; \
 	fi
 	@echo "$(BLUE)Restoring from $(BACKUP_FILE)...$(NC)"
-	tar xzf $(BACKUP_FILE) -C /tmp/
-	docker cp /tmp/instance/radiocalico.db radiocalico-dev:/app/instance/
-	docker-compose restart radiocalico
+	gunzip -c $(BACKUP_FILE) | docker compose exec -T postgres psql -U radiocalico radiocalico
 	@echo "$(GREEN)Database restored!$(NC)"
 
 backup-prod:
-	@echo "$(BLUE)Backing up production database...$(NC)"
+	@echo "$(BLUE)Backing up production PostgreSQL database...$(NC)"
 	@mkdir -p ./backups
-	docker-compose -f docker-compose.prod.yml exec -T radiocalico tar czf - instance/radiocalico.db | gzip > ./backups/backup-prod-$(shell date +%Y%m%d-%H%M%S).tar.gz
+	docker compose -f docker-compose.prod.yml exec -T postgres pg_dump -U radiocalico radiocalico | gzip > ./backups/backup-prod-$(shell date +%Y%m%d-%H%M%S).sql.gz
 	@echo "$(GREEN)Backup created in ./backups/$(NC)"
 
 restore-prod:
 	@echo "$(RED)This will overwrite production database!$(NC)"
 	@read -p "Are you sure? Type 'yes' to continue: " confirm && [ "$${confirm}" = "yes" ] || exit 1
 	@if [ -z "$(BACKUP_FILE)" ]; then \
-		echo "$(RED)Usage: make restore-prod BACKUP_FILE=./backups/backup-*.tar.gz$(NC)"; \
+		echo "$(RED)Usage: make restore-prod BACKUP_FILE=./backups/backup-*.sql.gz$(NC)"; \
 		exit 1; \
 	fi
 	@echo "$(BLUE)Restoring production from $(BACKUP_FILE)...$(NC)"
-	tar xzf $(BACKUP_FILE) -C /tmp/
-	docker cp /tmp/instance/radiocalico.db radiocalico-prod:/app/instance/
-	docker-compose -f docker-compose.prod.yml restart radiocalico
+	gunzip -c $(BACKUP_FILE) | docker compose -f docker-compose.prod.yml exec -T postgres psql -U radiocalico radiocalico
 	@echo "$(GREEN)Production database restored!$(NC)"
 
 db-shell:
-	docker-compose exec radiocalico sqlite3 instance/radiocalico.db
+	docker compose exec postgres psql -U radiocalico radiocalico
 
 # Utility targets
 clean:
 	@echo "$(RED)Removing containers and volumes...$(NC)"
-	docker-compose down -v
-	docker-compose -f docker-compose.prod.yml down -v
+	docker compose down -v
+	docker compose -f docker-compose.prod.yml down -v
 	@echo "$(GREEN)Cleanup complete$(NC)"
 
 prune:
@@ -150,10 +145,10 @@ prune:
 
 ps:
 	@echo "$(BLUE)Development containers:$(NC)"
-	docker-compose ps
+	docker compose ps
 	@echo ""
 	@echo "$(BLUE)Production containers:$(NC)"
-	docker-compose -f docker-compose.prod.yml ps
+	docker compose -f docker-compose.prod.yml ps
 
 stats:
 	docker stats radiocalico

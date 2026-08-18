@@ -225,6 +225,9 @@ let hls;
 let playStartTime = 0;
 let elapsedAtPause = 0;
 
+// Initialize player volume to maximum
+player.volume = 1.0;
+
 function initHLS() {
   if (Hls.isSupported()) {
     const hlsConfig = {

@@ -1,9 +1,28 @@
 version: '3.8'
 
-# Production setup with Nginx reverse proxy
-# Use this instead of docker-compose.prod.yml when you want nginx in front
+# Production setup with separate Nginx reverse proxy container
+# NOTE: nginx is now embedded in the Dockerfile. Use docker-compose.prod.yml instead.
+# This file is kept for reference if you need a separate nginx container.
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: radiocalico-postgres-prod
+    environment:
+      POSTGRES_DB: radiocalico
+      POSTGRES_USER: radiocalico
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-this-in-production}
+    volumes:
+      - postgres-data-prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U radiocalico"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - radiocalico-network
+
   radiocalico:
     build:
       context: .
@@ -11,20 +30,18 @@ services:
       target: production
     container_name: radiocalico-prod-app
     image: radiocalico:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
     # Don't expose ports directly - only to nginx
     expose:
-      - "3000"
       - "5000"
-    volumes:
-      - radiocalico-data:/app/instance
     environment:
       FLASK_APP: main.py
       FLASK_ENV: production
       PYTHONUNBUFFERED: "1"
       PYTHONDONTWRITEBYTECODE: "1"
-      NODE_ENV: production
-      PORT: 3000
-      DATABASE_URL: sqlite:////app/instance/radiocalico.db
+      DATABASE_URL: postgresql://radiocalico:${POSTGRES_PASSWORD:-change-this-in-production}@postgres:5432/radiocalico
       SECRET_KEY: ${SECRET_KEY:-change-this-in-production}
 
     restart: always
@@ -57,6 +74,7 @@ services:
       # - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./static:/app/static:ro
       # For HTTPS, mount certificates:
       # - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
@@ -73,7 +91,7 @@ services:
         max-file: "3"
 
 volumes:
-  radiocalico-data:
+  postgres-data-prod:
     driver: local
 
 networks:
