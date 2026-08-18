@@ -15,12 +15,31 @@ Use this checklist when deploying Radio Calico to production.
 - [ ] Review database connection string (consider PostgreSQL for production)
 - [ ] Verify CORS/proxy settings are appropriate
 
+### Security Scanning
+- [ ] Run full security audit
+  ```bash
+  make security
+  ```
+- [ ] Check npm dependencies for vulnerabilities
+  ```bash
+  make security-npm
+  ```
+- [ ] Check Python dependencies for vulnerabilities
+  ```bash
+  make security-python
+  ```
+- [ ] Address or document any discovered vulnerabilities
+- [ ] Confirm all critical and high-severity issues are resolved
+- [ ] Review audit exemptions (if any)
+
 ### Code Review
 - [ ] All features completed and tested
 - [ ] Code review completed
 - [ ] Tests passing locally
 - [ ] No console errors or warnings
 - [ ] Database migrations tested locally
+- [ ] Security scans passing (`make security`)
+- [ ] No unresolved dependency vulnerabilities
 
 ### Infrastructure Preparation
 - [ ] Docker installed and updated
@@ -212,12 +231,15 @@ docker-compose -f docker-compose.prod.yml up -d
 - [ ] Create database backup: `make backup-prod`
 - [ ] Review error logs
 - [ ] Check disk usage
+- [ ] Run security scans: `make security`
 
 ### Monthly Tasks
 - [ ] Review and update dependencies
 - [ ] Test backup restore procedure
 - [ ] Performance analysis and optimization
 - [ ] Security updates
+- [ ] Full security audit with `make security`
+- [ ] Review and address any new vulnerabilities
 
 ### Quarterly Tasks
 - [ ] Major version updates

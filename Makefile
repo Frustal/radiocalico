@@ -1,4 +1,4 @@
-.PHONY: help build up down logs shell test migrate backup restore
+.PHONY: help build up down logs shell test migrate backup restore security security-audit security-python
 
 # Colors for output
 BLUE := \033[0;34m
@@ -17,6 +17,11 @@ help:
 	@echo "  make shell              - Access container shell"
 	@echo "  make test               - Run all tests"
 	@echo "  make migrate            - Run database migrations"
+	@echo ""
+	@echo "$(GREEN)Security Commands:$(NC)"
+	@echo "  make security           - Run all security scans (npm + pip audit)"
+	@echo "  make security-audit     - Run npm audit for JavaScript dependencies"
+	@echo "  make security-python    - Run pip audit for Python dependencies"
 	@echo ""
 	@echo "$(GREEN)Production Commands:$(NC)"
 	@echo "  make build-prod         - Build production image"
@@ -67,6 +72,27 @@ shell:
 test:
 	@echo "$(BLUE)Running tests...$(NC)"
 	docker compose exec radiocalico pytest
+
+# Security targets
+security: security-npm security-python
+	@echo "$(GREEN)All security scans completed!$(NC)"
+
+security-npm:
+	@echo "$(BLUE)Running npm audit for JavaScript dependencies...$(NC)"
+	@npm audit --audit-level=moderate || { \
+		echo "$(RED)npm audit found vulnerabilities$(NC)"; \
+		exit 1; \
+	}
+	@echo "$(GREEN)npm audit passed!$(NC)"
+
+security-python:
+	@echo "$(BLUE)Running pip audit for Python dependencies...$(NC)"
+	docker compose exec radiocalico pip install pip-audit
+	docker compose exec radiocalico pip-audit || { \
+		echo "$(RED)pip-audit found vulnerabilities$(NC)"; \
+		exit 1; \
+	}
+	@echo "$(GREEN)pip-audit passed!$(NC)"
 
 migrate:
 	@echo "$(BLUE)Running database migrations...$(NC)"

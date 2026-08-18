@@ -31,12 +31,14 @@ FROM python:3.14-slim AS development
 
 WORKDIR /app
 
-# Install runtime dependencies + development tools + nginx
+# Install runtime dependencies + development tools + nginx + Node.js
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
     gnupg \
     nginx \
+    nodejs \
+    npm \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
@@ -54,7 +56,7 @@ COPY . .
 
 # Install additional dev dependencies for Python
 RUN pip install --upgrade pip && \
-    pip install pytest flask-testing watchdog[watchmedo]
+    pip install pytest flask-testing watchdog[watchmedo] pip-audit
 
 # Copy and configure nginx
 COPY nginx/nginx.conf /etc/nginx/sites-available/default

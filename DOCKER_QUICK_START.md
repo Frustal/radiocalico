@@ -30,6 +30,7 @@ make down           # Stop dev servers
 make logs           # View logs
 make shell          # Access container shell
 make test           # Run tests
+make security       # Run security scans (npm + pip audit)
 make migrate        # Apply DB migrations
 make backup         # Backup database
 ```
@@ -219,6 +220,7 @@ docker-compose ps              # Container status
 | View logs | `make logs` |
 | Shell access | `make shell` |
 | Run tests | `make test` |
+| Run security scans | `make security` |
 | Create backup | `make backup` |
 | Restore backup | `make restore BACKUP_FILE=...` |
 | Production start | `make up-prod` |
