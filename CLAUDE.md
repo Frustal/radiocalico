@@ -101,6 +101,7 @@ make down               # Stop containers
 make logs               # View container logs
 make shell              # Enter container shell (radiocalico app)
 make test               # Run pytest tests
+make security           # Run all security scans (npm + pip)
 make migrate            # Apply database migrations
 make backup             # Backup PostgreSQL database
 make db-shell           # Access PostgreSQL shell
@@ -154,6 +155,33 @@ python -m flask --app main db upgrade
 
 # Revert to previous version (rollback)
 python -m flask --app main db downgrade
+```
+
+### Security Scanning
+
+Automated security scanning for known vulnerabilities in dependencies:
+
+```bash
+# Run all security scans (npm + Python)
+make security
+
+# Run npm audit (JavaScript/Node.js dependencies)
+make security-npm
+
+# Run pip-audit (Python dependencies)
+make security-python
+```
+
+**What it does:**
+- `npm audit` — Scans package.json for known JavaScript vulnerabilities, uses `--audit-level=moderate` to flag real issues
+- `pip-audit` — Scans Python dependencies in requirements/installed packages for known CVEs
+- Both exit with error codes if vulnerabilities are found, suitable for CI/CD gates
+
+**Output example:**
+```
+✓ npm audit passed!
+✓ pip-audit passed!
+✓ All security scans completed!
 ```
 
 ### Linting / Formatting
