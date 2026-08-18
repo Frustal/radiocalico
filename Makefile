@@ -79,7 +79,7 @@ security: security-npm security-python
 
 security-npm:
 	@echo "$(BLUE)Running npm audit for JavaScript dependencies...$(NC)"
-	@npm audit --audit-level=moderate || { \
+	docker compose exec radiocalico npm audit --audit-level=moderate || { \
 		echo "$(RED)npm audit found vulnerabilities$(NC)"; \
 		exit 1; \
 	}
@@ -87,7 +87,6 @@ security-npm:
 
 security-python:
 	@echo "$(BLUE)Running pip audit for Python dependencies...$(NC)"
-	docker compose exec radiocalico pip install pip-audit
 	docker compose exec radiocalico pip-audit || { \
 		echo "$(RED)pip-audit found vulnerabilities$(NC)"; \
 		exit 1; \
