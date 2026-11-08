@@ -1,4 +1,6 @@
-# Radio Calico
+# Radio Calico Copy
+
+Project based on Udemy course https://www.udemy.com/course/anthropic-claude-code/?couponCode=25BBPMXINACTIVE
 
 A streaming radio application with an integrated rating system. Users can listen to live HLS audio streams, view track metadata, and rate songs with thumbs-up/down voting.
 
